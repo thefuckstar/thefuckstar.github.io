@@ -1,18 +1,12 @@
 {
-  "showId": "f23e4afc0bcc470198852adba4154b5b",
-  "start": "2026-10-10T22:00:00+03:00",
-  "startUnix": 1791658800,
-  "pause": true,
-  "pauseUnix": 1791658892.121571,
-  "pausePosition": 92.12157106399536,
+  "showId": "13811035afb74a8299ee0891b27cbf20",
+  "start": "2026-10-10T22:15:00+03:00",
+  "startUnix": 1791659700.0,
+  "pause": false,
+  "pauseUnix": null,
+  "pausePosition": 0.0,
   "pausedDuration": 0.0,
-  "pauseIntervals": [
-    {
-      "startUnix": 1791658892.121571,
-      "endUnix": null,
-      "position": 92.12157106399536
-    }
-  ],
+  "pauseIntervals": [],
   "movie": "movie.mp4",
   "size": 564078578,
   "mime": "video/mp4",
