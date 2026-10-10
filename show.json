@@ -1,23 +1,12 @@
 {
-  "showId": "604194549dec41518925284466c9939f",
-  "start": "2026-10-10T22:14:00+03:00",
-  "startUnix": 1791659640,
-  "pause": true,
-  "pauseUnix": 1791660045.770198,
-  "pausePosition": 395.0924940109253,
-  "pausedDuration": 10.677704095840454,
-  "pauseIntervals": [
-    {
-      "startUnix": 1791659827.908722,
-      "endUnix": 1791659838.586426,
-      "position": 187.90872192382812
-    },
-    {
-      "startUnix": 1791660045.770198,
-      "endUnix": null,
-      "position": 395.0924940109253
-    }
-  ],
+  "showId": "9d531424cdd24ab9a3ad108b4435eaea",
+  "start": "2026-10-10T22:40:00+03:00",
+  "startUnix": 1791661200.0,
+  "pause": false,
+  "pauseUnix": null,
+  "pausePosition": 0.0,
+  "pausedDuration": 0.0,
+  "pauseIntervals": [],
   "movie": "movie.mp4",
   "size": 564078578,
   "mime": "video/mp4",
