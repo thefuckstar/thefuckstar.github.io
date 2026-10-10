@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Кинозал</title>
+    <style>
+        body, html {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+        }
+        body {
+            display: flex;
+        }
+        #countdown {
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100vw;
+            height: 100vh;
+            padding: 0 .5em;
+            background: #000;
+            color: #fff;
+            font-family: serif;
+            font-size: clamp(30px, 18vw, 50px);
+            cursor: default;
+            font-weight: 400;
+            line-height: 1;
+            text-align: center;
+            z-index: 10;
+        }
+        #countdown.hidden, #player.hidden {
+            display: none;
+        }
+        video {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            object-fit: contain;
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+    <div id="countdown" class="hidden">Подключение…</div>
+    <video id="player" class="hidden" controls playsinline preload="auto"></video>
+    <script>
+        "use strict";
+        const SHOW_URL = "https://thefuckstar.github.io/show.json",
+              MOVIE_URL = "https://github.com/thefuckstar/thefuckstar.github.io/releases/download/current-movie/movie.mp4",
+              player = document.getElementById("player"),
+              countdown = document.getElementById("countdown");
+
+        let show = null,
+            refreshTimer = null,
+            positionTimer = null,
+            currentShowId = null,
+            lastPauseState = null,
+            forcingPosition = false,
+            showFinishedState = false;
+
+        function showCountdown() {
+            countdown && countdown.classList.remove("hidden");
+            player && player.classList.add("hidden");
+        }
+
+        function showPlayer() {
+            countdown && countdown.classList.add("hidden");
+            player && player.classList.remove("hidden");
+        }
+
+        function formatCountdown(e) {
+            const t = Math.max(0, Math.ceil(e)),
+                  r = Math.floor(t / 3600),
+                  a = Math.floor(t % 3600 / 60),
+                  n = t % 60;
+            return `${String(r).padStart(2, "0")}:${String(a).padStart(2, "0")}:${String(n).padStart(2, "0")}`;
+        }
+
+        function updateCountdown() {
+            if (!show || !countdown) return false;
+            const e = getStartUnix();
+            if (!Number.isFinite(e)) return false;
+            const t = e - Date.now() / 1e3;
+            return t > 0 && (countdown.textContent = formatCountdown(t), showCountdown(), player.paused || player.pause(), true);
+        }
+
+        function showFinished() {
+            showFinishedState = true;
+            resetPlaybackRate();
+            player.pause();
+            player.classList.add("hidden");
+            countdown && (countdown.textContent = "Показ завершен", countdown.classList.remove("hidden"));
+        }
+
+        async function fetchShow() {
+            const e = await fetch(`${SHOW_URL}?t=${Date.now()}`, { cache: "no-store" });
+            if (!e.ok) throw new Error(`HTTP ${e.status}`);
+            return e.json();
+        }
+
+        function getStartUnix() {
+            if (!show) return NaN;
+            if (void 0 !== show.startUnix && null !== show.startUnix) {
+                const e = Number(show.startUnix);
+                if (Number.isFinite(e)) return e;
+            }
+            if (void 0 !== show.start && null !== show.start) {
+                if ("number" == typeof show.start) return show.start;
+                const e = Number(show.start);
+                if (Number.isFinite(e)) return e;
+                const t = Date.parse(show.start);
+                if (Number.isFinite(t)) return t / 1e3;
+            }
+            return NaN;
+        }
+
+        function getPausedDuration() {
+            if (!show) return 0;
+            const e = Array.isArray(show.pauseIntervals) ? show.pauseIntervals : [];
+            let t = 0;
+            for (const r of e) {
+                if (!r) continue;
+                let e = Number(r.start ?? r.from ?? r.startUnix),
+                    a = Number(r.end ?? r.to ?? r.endUnix);
+                Number.isFinite(e) && (Number.isFinite(a) || (a = Date.now() / 1e3), a > e && (t += a - e));
+            }
+            return t;
+        }
+
+        function getShowPosition() {
+            if (!show) return NaN;
+            const e = getStartUnix();
+            if (!Number.isFinite(e)) return NaN;
+            let t = Date.now() / 1e3 - e;
+            return t -= getPausedDuration(), true === show.pause && Number.isFinite(Number(show.pausePosition)) ? Number(show.pausePosition) : Math.max(0, t);
+        }
+
+        function setVideoPosition(e) {
+            if (!Number.isFinite(e) || !Number.isFinite(player.duration)) return;
+            const t = Math.max(0, Math.min(e, player.duration));
+            forcingPosition = true;
+            try {
+                player.currentTime = t;
+            } catch (e) {
+                console.error("SEEK ERROR:", e);
+            }
+            forcingPosition = false;
+        }
+
+        function resetPlaybackRate() {
+            1 !== player.playbackRate && (player.playbackRate = 1);
+        }
+
+        function synchronizePlaybackRate(e) {
+            if (!Number.isFinite(player.duration) || player.paused) return void resetPlaybackRate();
+            const t = e - player.currentTime,
+                  r = Math.abs(t);
+            if (r < .25) return void resetPlaybackRate();
+            if (r > 2) return resetPlaybackRate(), void setVideoPosition(e);
+            let a = 1;
+            t > 1 ? a = 1.025 : t > .5 ? a = 1.015 : t > .25 ? a = 1.008 : t < -1 ? a = .975 : t < -.5 ? a = .985 : t < -.25 && (a = .992),
+            player.playbackRate !== a && (player.playbackRate = a);
+        }
+
+        function applyPauseState(e = false) {
+            if (!show || !player) return;
+            if (true === show.pause) {
+                resetPlaybackRate();
+                const t = Number(show.pausePosition);
+                return Number.isFinite(t) && (e || Math.abs(player.currentTime - t) > .25) && setVideoPosition(t), void (player.paused || player.pause());
+            }
+            const t = getShowPosition();
+            Number.isFinite(t) && (e || Math.abs(player.currentTime - t) > 2) && setVideoPosition(t);
+        }
+
+        async function tryPlay() {
+            if (player && show && true !== show.pause && !showFinishedState) {
+                try {
+                    await player.play();
+                } catch (e) {
+                    console.warn("PLAY BLOCKED:", e);
+                }
+            }
+        }
+
+        async function applyShow(e) {
+            const t = e.showId || null,
+                  r = currentShowId !== t,
+                  a = lastPauseState !== e.pause,
+                  n = show;
+            if (r && (showFinishedState = false), show = e, currentShowId = t, lastPauseState = e.pause, updateCountdown()) {
+                r && (player.pause(), player.removeAttribute("src"), player.load());
+            } else {
+                if (r) {
+                    console.log("NEW SHOW:", e);
+                    player.pause();
+                    resetPlaybackRate();
+                    player.removeAttribute("src");
+                    player.load();
+                    if (Number.isFinite(getStartUnix()) && Date.now() / 1e3 < getStartUnix()) return;
+                    player.src = MOVIE_URL;
+                    player.preload = "auto";
+                    return player.load();
+                }
+                if (n && !showFinishedState) {
+                    return player.getAttribute("src") ? (showPlayer(), a ? (applyPauseState(true), void (e.pause || tryPlay())) : void 0) : (player.src = MOVIE_URL, player.preload = "auto", void player.load());
+                }
+            }
+        }
+
+        async function loadShow() {
+            try {
+                const e = await fetchShow();
+                await applyShow(e);
+            } catch (e) {
+                console.error("SHOW LOAD ERROR:", e);
+            }
+        }
+
+        function startRefresh() {
+            refreshTimer && clearInterval(refreshTimer);
+            refreshTimer = setInterval(loadShow, 4e3);
+        }
+
+        function synchronizeVideo() {
+            if (!show || !player) return;
+            if (updateCountdown()) return;
+            if (showFinishedState) return;
+            if (!player.getAttribute("src")) return player.src = MOVIE_URL, player.preload = "auto", void player.load();
+            if (!Number.isFinite(player.duration)) return;
+            showPlayer();
+            const e = getStartUnix();
+            if (!Number.isFinite(e)) return;
+            if (Date.now() / 1e3 < e) return resetPlaybackRate(), void (player.paused || player.pause());
+            if (true === show.pause) {
+                resetPlaybackRate();
+                const e = Number(show.pausePosition);
+                return Number.isFinite(e) && Math.abs(player.currentTime - e) > .25 && setVideoPosition(e), void (player.paused || player.pause());
+            }
+            const t = getShowPosition();
+            if (t >= player.duration) return resetPlaybackRate(), player.pause(), void showFinished();
+            synchronizePlaybackRate(t);
+            player.paused && tryPlay();
+        }
+
+        player.addEventListener("seeked", () => {});
+        player.addEventListener("loadedmetadata", () => { show && applyPauseState(true); });
+        player.addEventListener("canplay", () => {
+            if (!show) return;
+            if (updateCountdown()) return;
+            if (showFinishedState) return;
+            if (showPlayer(), true === show.pause) return void applyPauseState(true);
+            const e = getShowPosition();
+            Number.isFinite(player.duration) && e < player.duration && (Math.abs(player.currentTime - e) > .5 && setVideoPosition(e), tryPlay());
+        });
+        player.addEventListener("pause", () => {});
+        player.addEventListener("ended", () => { showFinished(); });
+        player.addEventListener("error", () => { console.error("VIDEO ERROR:", player.error); });
+
+        showCountdown();
+        loadShow();
+        startRefresh();
+        positionTimer = setInterval(synchronizeVideo, 1e3);
+    </script>
+</body>
+</html>

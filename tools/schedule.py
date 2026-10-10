@@ -2,6 +2,7 @@
 import getpass
 import json
 import os
+import subprocess
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -52,55 +53,60 @@ def verify_movie(release):
         raise RuntimeError(f"В Release {RELEASE_TAG} нет корректного {MOVIE_FILENAME}.")
     return asset
 
-def worker_update(data, token):
-    r = requests.post(UPDATE_URL, headers={"Authorization": f"Bearer {token}",
-                       "Content-Type": "application/json"}, data=json.dumps(data, ensure_ascii=False),
-                       timeout=30)
+def sync_show(data, update_token, repo):
+    # 1. Отправка сигнала на Cloudflare Worker
+    r = requests.post(
+        UPDATE_URL,
+        headers={
+            "Authorization": f"Bearer {update_token}",
+            "Content-Type": "application/json"
+        },
+        data=json.dumps(data, ensure_ascii=False),
+        timeout=30
+    )
     if not r.ok:
         raise RuntimeError(f"Worker {r.status_code}: {r.text.strip() or r.reason}")
+
+    # 2. Сохранение show.json в репозиторий и коммит с пушем в git
+    show_json_path = repo / "show.json"
+    show_json_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    try:
+        subprocess.run(["git", "-C", str(repo), "add", "show.json"], check=True)
+        status = subprocess.run(
+            ["git", "-C", str(repo), "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        if "show.json" in status.stdout:
+            subprocess.run(
+                ["git", "-C", str(repo), "commit", "-m", f"Update show.json: {data.get('showId', 'unknown')}"],
+                check=True
+            )
+            subprocess.run(["git", "-C", str(repo), "push"], check=True)
+            print("✓ Изменения зафиксированы и отправлены в git.")
+    except Exception as e:
+        print(f"⚠ Ошибка при коммите/пуше в git: {e}")
+
     return r.json()
 
 def read_show():
-    """
-    Получить актуальное состояние показа.
-
-    Query-параметр делает каждый запрос уникальным,
-    а cache headers запрещают клиентскому HTTP-кэшу
-    использовать старый ответ.
-    """
-
     url = f"{SHOW_URL}?_={uuid.uuid4().hex}"
-
     headers = {
-        "Cache-Control": (
-            "no-cache, no-store, max-age=0, "
-            "must-revalidate"
-        ),
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
         "Pragma": "no-cache",
         "User-Agent": USER_AGENT,
     }
-
-    r = requests.get(
-        url,
-        headers=headers,
-        timeout=15,
-    )
-
+    r = requests.get(url, headers=headers, timeout=15)
     if r.status_code == 404:
         return None
-
     if not r.ok:
-        raise RuntimeError(
-            f"Worker {r.status_code}: "
-            f"{r.text.strip() or r.reason}"
-        )
-
+        raise RuntimeError(f"Worker {r.status_code}: {r.text.strip() or r.reason}")
     try:
         return r.json()
     except ValueError as e:
-        raise RuntimeError(
-            f"Worker вернул некорректный JSON: {e}"
-        )
+        raise RuntimeError(f"Worker вернул некорректный JSON: {e}")
 
 def parse_time(value):
     try:
@@ -178,15 +184,15 @@ def new_show(start, asset):
             "pauseIntervals": [], "movie": MOVIE_FILENAME, "size": asset["size"],
             "mime": "video/mp4", "url": WORKER_URL}
 
-def create_show(owner, github_repo, github_token, update_token):
+def create_show(owner, github_repo, github_token, update_token, repo):
     release = get_release(owner, github_repo, github_token)
     asset = verify_movie(release)
     start = ask_time("Время показа", datetime.now(TZ))
     data = new_show(start, asset)
-    worker_update(data, update_token)
+    sync_show(data, update_token, repo)
     print(f"✓ Показ создан: {format_time(start)}")
 
-def change_time(update_token):
+def change_time(update_token, repo):
     data = read_show()
     if not data:
         print("Показ ещё не создан.")
@@ -203,10 +209,10 @@ def change_time(update_token):
     data["pauseIntervals"] = []
     data["movie"] = MOVIE_FILENAME
     data["url"] = WORKER_URL
-    worker_update(data, update_token)
+    sync_show(data, update_token, repo)
     print(f"✓ Время обновлено: {format_time(new)}")
 
-def toggle_pause(update_token):
+def toggle_pause(update_token, repo):
     data = read_show()
     if not data:
         print("Показ ещё не создан.")
@@ -249,7 +255,7 @@ def toggle_pause(update_token):
     data["pauseIntervals"] = intervals
     data["movie"] = MOVIE_FILENAME
     data["url"] = WORKER_URL
-    worker_update(data, update_token)
+    sync_show(data, update_token, repo)
 
     state = "включена" if data["pause"] else "выключена"
     print(f"✓ Пауза {state}.")
@@ -260,18 +266,14 @@ def toggle_pause(update_token):
 
 def current_show():
     data = read_show()
-
     if not data:
         print("Показ не запланирован.")
         return
-
     try:
         start = format_time(datetime.fromisoformat(data["start"]))
     except (KeyError, TypeError, ValueError):
         start = "—"
-
     elapsed = position(data)
-
     print(f"\nID показа: {data.get('showId', '—')}")
     print(f"Время показа: {start}")
     print(f"Просмотрено: {format_duration(elapsed)}")
@@ -284,29 +286,23 @@ def verify_current(owner, github_repo, github_token):
     data = read_show()
     release = get_release(owner, github_repo, github_token)
     asset = verify_movie(release)
-
     print(f"✓ {MOVIE_FILENAME} найден: {asset['size']:,} байт")
-
     if data:
         print("✓ show.json получен из Worker KV")
         print(f"✓ showId: {data.get('showId', 'нет')}")
         print(f"✓ pause: {data.get('pause', False)}")
     else:
-        print("⚠ Текущий показ отсутствует в Worker KV.")
+        print("⚠ Текущий показ отсутствует.")
 
 def find_repo():
     env_repo = os.getenv("REPO_DIR")
-
     if env_repo:
         return Path(env_repo).expanduser().resolve()
-
     repo = Path(__file__).resolve().parent
-
     while repo != repo.parent:
         if (repo / ".git").exists():
             return repo
         repo = repo.parent
-
     raise RuntimeError("Не удалось найти корень Git-репозитория.")
 
 def main():
@@ -324,15 +320,15 @@ def main():
 
         try:
             if choice == "1":
-                create_show(owner, github_repo, github_token, update_token)
+                create_show(owner, github_repo, github_token, update_token, repo)
             elif choice == "2":
                 current_show()
             elif choice == "3":
-                change_time(update_token)
+                change_time(update_token, repo)
             elif choice == "4":
                 verify_current(owner, github_repo, github_token)
             elif choice == "5":
-                toggle_pause(update_token)
+                toggle_pause(update_token, repo)
             else:
                 print("Неизвестный пункт меню.")
 
