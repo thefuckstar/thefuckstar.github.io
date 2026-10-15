@@ -1,25 +1,14 @@
 {
-  "showId": "5fc018f6e5b9460eb9081322247bcaa4",
-  "start": "2026-10-14T22:36:02.123687+03:00",
-  "startUnix": 1792006562.123687,
+  "showId": "8eb43e1740b44643b1e9e4e35301450b",
+  "start": "2026-10-15T22:00:00+03:00",
+  "startUnix": 1792090800.0,
   "pause": false,
   "pauseUnix": null,
-  "pausePosition": 2417.3996579647064,
-  "pausedDuration": 203.9478828907013,
-  "pauseIntervals": [
-    {
-      "startUnix": 1792006589.730706,
-      "endUnix": 1792006692.948431,
-      "position": 27.60701894760132
-    },
-    {
-      "startUnix": 1792009082.74107,
-      "endUnix": 1792009183.471228,
-      "position": 2417.3996579647064
-    }
-  ],
+  "pausePosition": 0.0,
+  "pausedDuration": 0.0,
+  "pauseIntervals": [],
   "movie": "movie.mp4",
-  "size": 1705194649,
+  "size": 2145249905,
   "mime": "video/mp4",
   "url": "https://raspy-cake-1c1a.qwgvpgy.workers.dev"
 }
