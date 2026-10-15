@@ -2,10 +2,10 @@
   "showId": "8eb43e1740b44643b1e9e4e35301450b",
   "start": "2026-10-15T22:00:00+03:00",
   "startUnix": 1792090800,
-  "pause": true,
-  "pauseUnix": 1792091551.391965,
+  "pause": false,
+  "pauseUnix": null,
   "pausePosition": 533.7828397750854,
-  "pausedDuration": 217.6091251373291,
+  "pausedDuration": 456.34270119667053,
   "pauseIntervals": [
     {
       "startUnix": 1792091133.318807,
@@ -14,7 +14,7 @@
     },
     {
       "startUnix": 1792091551.391965,
-      "endUnix": null,
+      "endUnix": 1792091790.125541,
       "position": 533.7828397750854
     }
   ],
