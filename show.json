@@ -1,12 +1,18 @@
 {
   "showId": "11b21877766e42ca9e5940c620a08565",
   "start": "2026-10-24T20:50:00+03:00",
-  "startUnix": 1792864200.0,
-  "pause": false,
-  "pauseUnix": null,
-  "pausePosition": 0.0,
+  "startUnix": 1792864200,
+  "pause": true,
+  "pauseUnix": 1792864218.435594,
+  "pausePosition": 18.435594081878662,
   "pausedDuration": 0.0,
-  "pauseIntervals": [],
+  "pauseIntervals": [
+    {
+      "startUnix": 1792864218.435594,
+      "endUnix": null,
+      "position": 18.435594081878662
+    }
+  ],
   "movie": "movie.mp4",
   "size": 2145851138,
   "mime": "video/mp4",
