@@ -1,14 +1,14 @@
 {
-  "showId": "01e76ce5706e40b89b44b08db8246481",
-  "start": "2026-10-24T21:02:00+03:00",
-  "startUnix": 1792864920.0,
+  "showId": "06a98cc1c6a245709e9fbbbce9b972c7",
+  "start": "2026-10-25T21:00:00+03:00",
+  "startUnix": 1792951200.0,
   "pause": false,
   "pauseUnix": null,
   "pausePosition": 0.0,
   "pausedDuration": 0.0,
   "pauseIntervals": [],
   "movie": "movie.mp4",
-  "size": 2145851138,
+  "size": 579109536,
   "mime": "video/mp4",
   "url": "https://raspy-cake-1c1a.qwgvpgy.workers.dev"
 }
